@@ -11,14 +11,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import GoogleSignInButton from "../github-auth-button";
+import { handleLogin } from "@/lib/actions";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Enter a valid email address" }),
+  username: z.string(),
+  password: z.string(),
 });
 
 type UserFormValue = z.infer<typeof formSchema>;
@@ -26,9 +28,11 @@ type UserFormValue = z.infer<typeof formSchema>;
 export default function UserAuthForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl");
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const defaultValues = {
-    email: "demo@gmail.com",
+    password: "test@123",
+    username: "doejohn",
   };
   const form = useForm<UserFormValue>({
     resolver: zodResolver(formSchema),
@@ -36,10 +40,31 @@ export default function UserAuthForm() {
   });
 
   const onSubmit = async (data: UserFormValue) => {
-    signIn("credentials", {
-      email: data.email,
-      callbackUrl: callbackUrl ?? "/dashboard",
+    const res = await fetch("http://localhost:8080/api/v1/users/login/", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
     });
+
+    const resdata = await res.json();
+    console.log("res", resdata);
+
+    if (resdata.statusCode === 200) {
+      handleLogin(
+        resdata.data.user._id,
+        resdata.data.accessToken,
+        resdata.data.refreshToken,
+      );
+      router.push("/dashboard");
+    }
+
+    // signIn("credentials", {
+    //   email: data.email,
+    //   callbackUrl: callbackUrl ?? "/dashboard",
+    // });
   };
 
   return (
@@ -51,14 +76,32 @@ export default function UserAuthForm() {
         >
           <FormField
             control={form.control}
-            name="email"
+            name="username"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
                   <Input
-                    type="email"
+                    type="text"
                     placeholder="Enter your email..."
+                    disabled={loading}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="Enter your pass..."
                     disabled={loading}
                     {...field}
                   />
